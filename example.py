@@ -1,19 +1,18 @@
 #!/bin/python
 import gym
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-#import matplotlib.pyplot as plt
 from collections import deque
 import random
 import os
-import torch
-import gym, gym_mupen64plus
 import numpy as np
-import matplotlib.image
-import wandb
-import pytz
+# import matplotlib.pyplot as plt
+# import matplotlib.image
+# import wandb
+# import pytz
 import cv2
 from datetime import datetime
 from PIL import Image
@@ -52,21 +51,21 @@ C=64 # learning rate
 EPSILON=0.9 # for e-greedy
 
 # Timezone for logging
-timezone = pytz.timezone("Canada/Eastern")
+# timezone = pytz.timezone("Canada/Eastern")
 
-wandb.init(
-    # set the wandb project where this run will be logged
-    project="AndyKart",
-    name=datetime.now(timezone).strftime("%H:%M:%S"),
-    # track hyperparameters and run metadata
-    config={
-    "erb capacity": ERB_CAPACITY,
-    "batch size": BATCH_SIZE,
-    "episodes": EPISODES,
-    "c": C,
-    "epsilon": EPSILON
-    }
-)
+# wandb.init(
+#     # set the wandb project where this run will be logged
+#     project="AndyKart",
+#     name=datetime.now(timezone).strftime("%H:%M:%S"),
+#     # track hyperparameters and run metadata
+#     config={
+#     "erb capacity": ERB_CAPACITY,
+#     "batch size": BATCH_SIZE,
+#     "episodes": EPISODES,
+#     "c": C,
+#     "epsilon": EPSILON
+#     }
+# )
 
 ## Experience Replay Buffer
 class ReplayBuffer:
@@ -146,7 +145,7 @@ for episode in range(EPISODES):
         else:
             # select optimal action
             phi_state = preprocess(state)
-            tensor_state = torch.tensor(state, dtype=torch.float32).unsqueeze(1)
+            tensor_state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
             q_values = model(phi_state)
             action = DiscreteActions.ACTION_MAP[torch.argmax(q_values, dim=1)]
             #print('selected optimal action', action)
@@ -155,7 +154,7 @@ for episode in range(EPISODES):
         # execute action in emulator
         print('executing action', action[0])
         (obs, rew, end, info) = env.step(action[1])
-        wandb.log({ "reward": rew })
+        # wandb.log({ "reward": rew })
 
         # preprocess image
 
