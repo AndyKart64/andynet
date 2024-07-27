@@ -71,7 +71,11 @@ RUN pip install \
     PyYAML==5.1 \
     termcolor==1.1.0 \
     mss==4.0.2 \
-    opencv-python==4.1.0.25
+    opencv-python==4.1.0.25 \
+    torch \
+    torchvision \
+    torchaudio \
+    matplotlib
 
 # Copy compiled input plugin from buildstuff layer
 COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/local/lib/mupen64plus/
