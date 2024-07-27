@@ -100,6 +100,7 @@ class DQN(nn.Module):
         self.fc2 = nn.Linear(DQN.HIDDEN_SIZE, DQN.N_ACTIONS)
 
     def forward(self, x):
+        print('x', x)
         x = self.conv1(x)
         x = F.relu(x)
         x = self.conv2(x)
@@ -108,8 +109,9 @@ class DQN(nn.Module):
         x = x.view(x.size(0), -1)
 
         x = self.fc1(x)
-        x = self.relu(x)
+        x = F.relu(x)
         x = self.fc2(x)
+        print('fc2', x)
 
         return x
 
@@ -119,13 +121,13 @@ print(model)
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
-state = env.reset()
-print('state', state.shape, state)
-
 
 for episode in range(EPISODES):
 
     print("Episode ", episode, " ========= ")
+
+    state = env.reset()
+    print('state', state.shape, state)
 
     print("NOOP waiting for green light")
     for i in range(18):
@@ -145,8 +147,8 @@ for episode in range(EPISODES):
         else:
             # select optimal action
             phi_state = preprocess(state)
-            tensor_state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
-            q_values = model(phi_state)
+            tensor_state = torch.tensor(phi_state, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            q_values = model(tensor_state)
             action = DiscreteActions.ACTION_MAP[torch.argmax(q_values, dim=1)]
             #print('selected optimal action', action)
 
