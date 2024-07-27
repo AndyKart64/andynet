@@ -1,6 +1,8 @@
 #!/bin/python
 import gym, gym_mupen64plus
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 env.reset()
@@ -19,6 +21,13 @@ for i in range(10000):
         print("Step " + str(i))
     (obs, rew, end, info) = env.step([-80, 0, 1, 0, 0]) # Hard-left doughnuts!
     (obs, rew, end, info) = env.step([-80, 0, 0, 0, 0]) # Hard-left doughnuts!
+    # print(type(obs), obs.shape, obs)
+
+    # convert observation to greyscale
+    greyscale = np.dot(obs[..., :3], [0.2989, 0.5870, 0.1140])
+
+    if i == 0:
+        plt.imsave('saved_greyscale_image.png', greyscale, cmap='gray')
 
 raw_input("Press <enter> to exit... ")
 
