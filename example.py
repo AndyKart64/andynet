@@ -1,5 +1,6 @@
 #!/bin/python
 import gym, gym_mupen64plus
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
