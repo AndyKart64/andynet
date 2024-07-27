@@ -1,19 +1,18 @@
 #!/bin/python
 import gym
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-#import matplotlib.pyplot as plt
 from collections import deque
 import random
 import os
-import torch
-import gym, gym_mupen64plus
 import numpy as np
-import matplotlib.image
-import wandb
-import pytz
+# import matplotlib.pyplot as plt
+# import matplotlib.image
+# import wandb
+# import pytz
 import cv2
 from datetime import datetime
 from PIL import Image
@@ -26,6 +25,12 @@ def rgb_to_gray(rgb):
     """
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
+def downscale(img):
+    return cv2.resize(img, dsize=(84, 84), interpolation=cv2.INTER_CUBIC)
+
+def preprocess(state):
+    return downscale(rgb_to_gray(state))
+
 def save_grayscale_image(gray, file_name):
     """
     Saves the grayscale image to the logs file
@@ -34,7 +39,7 @@ def save_grayscale_image(gray, file_name):
     """
     matplotlib.image.imsave('/src/gym_mupen64plus/logs/' + file_name, gray, cmap='gray')
 
-    return cv2.resize(gray, dsize=(84, 84), interpolation=cv2.INTER_CUBIC)
+    return downscale(gray)
 
 
 ## Hyperparameters
@@ -46,21 +51,21 @@ C=64 # learning rate
 EPSILON=0.9 # for e-greedy
 
 # Timezone for logging
-timezone = pytz.timezone("Canada/Eastern")
+# timezone = pytz.timezone("Canada/Eastern")
 
-wandb.init(
-    # set the wandb project where this run will be logged
-    project="AndyKart",
-    name=datetime.now(timezone).strftime("%H:%M:%S"),
-    # track hyperparameters and run metadata
-    config={
-    "erb capacity": ERB_CAPACITY,
-    "batch size": BATCH_SIZE,
-    "episodes": EPISODES,
-    "c": C,
-    "epsilon": EPSILON
-    }
-)
+# wandb.init(
+#     # set the wandb project where this run will be logged
+#     project="AndyKart",
+#     name=datetime.now(timezone).strftime("%H:%M:%S"),
+#     # track hyperparameters and run metadata
+#     config={
+#     "erb capacity": ERB_CAPACITY,
+#     "batch size": BATCH_SIZE,
+#     "episodes": EPISODES,
+#     "c": C,
+#     "epsilon": EPSILON
+#     }
+# )
 
 ## Experience Replay Buffer
 class ReplayBuffer:
@@ -79,11 +84,11 @@ class ReplayBuffer:
         return random.sample(self.buffer, batch_size)
 
     def __len__(self):
-        return len(self.buffer)
     
+        return len(self.buffer)
 class DQN(nn.Module):
 
-    N_OBS=84*84*4
+    N_OBS=84*84
     N_ACTIONS=len(DiscreteActions.ACTION_MAP)
     HIDDEN_SIZE=128
 
@@ -95,6 +100,7 @@ class DQN(nn.Module):
         self.fc2 = nn.Linear(DQN.HIDDEN_SIZE, DQN.N_ACTIONS)
 
     def forward(self, x):
+        print('x', x)
         x = self.conv1(x)
         x = F.relu(x)
         x = self.conv2(x)
@@ -103,31 +109,11 @@ class DQN(nn.Module):
         x = x.view(x.size(0), -1)
 
         x = self.fc1(x)
-        x = self.relu(x)
+        x = F.relu(x)
         x = self.fc2(x)
+        print('fc2', x)
 
         return x
-
-def rgb_to_gray(rgb):
-    """
-    Converts the three channel RGB colour to grayscale
-        - rgb : np.ndarray
-    """
-    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
-
-# greyscale + downscale image
-def preprocess(state_tensor):
-    return rgb_to_gray(state_tensor)
-
-def save_grayscale_image(gray, file_name):
-    """
-    Saves the grayscale image to the logs file
-        - gray: np.ndarray
-        - file_name: str
-    """
-    matplotlib.image.imsave('/src/gym_mupen64plus/logs/' + "file_name", gray, cmap='gray')
-
-
 
 model = DQN()
 print(model)
@@ -135,12 +121,14 @@ print(model)
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
-state = env.reset()
-print('state', state.shape, state)
 
 for episode in range(EPISODES):
 
     print("Episode ", episode, " ========= ")
+
+    state = env.reset()
+    print('state', state.shape, state)
+
     print("NOOP waiting for green light")
     for i in range(18):
         (obs, rew, end, info) = env.step([0, 0, 0, 0, 0]) # NOOP until green light
@@ -159,24 +147,18 @@ for episode in range(EPISODES):
         else:
             # select optimal action
             phi_state = preprocess(state)
-            q_values = model(phi_state)
-            action = DiscreteActions.ACTION_MAP[np.argmax(q_values)]
+            tensor_state = torch.tensor(phi_state, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            q_values = model(tensor_state)
+            action = DiscreteActions.ACTION_MAP[torch.argmax(q_values, dim=1)]
             #print('selected optimal action', action)
 
             
-            # execute action in emulator
-            (obs, rew, end, info) = env.step(action) # Drive straight
-            wandb.log({ "reward": rew })
-            # preprocess image
-            # convert observation to greyscale
-            greyscale = rgb_to_gray(obs)
+        # execute action in emulator
+        print('executing action', action[0])
+        (obs, rew, end, info) = env.step(action[1])
+        # wandb.log({ "reward": rew })
 
-            # Resize the image to 84 x 84
-            rescaled = cv2.resize(greyscale, dsize=(84, 84), interpolation=cv2.INTER_LINEAR)
-
-            if i == 0:
-                save_grayscale_image(greyscale, 'greyscale_image.jpg')
-                save_grayscale_image(rescaled, 'rescaled_image.jpg')
+        # preprocess image
 
         # sample random minibatch from ERB
 
