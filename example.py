@@ -2,32 +2,76 @@
 import gym, gym_mupen64plus
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+from collections import deque
+import random
+
+## Hyperparameters
+ERB_CAPACITY=1000
+BATCH_SIZE=32
+
+EPISODES=100
+C=64 # learning rate
+EPSILON=0.9 # for e-greedy
+
+## Experience Replay Buffer
+class ReplayBuffer:
+    
+    def __init__(self, capacity):
+        self.buffer = deque(maxlen=capacity)
+
+    # Add a new experience to the ERB, discarding experiences if at max capacity
+    def add(self, state, action, reward, next_state):
+        experience = (state, action, reward, next_state)
+        self.buffer.append(experience)
+
+    # Randomly sample N experiences
+    # It is crucial that these are not sampled in order, to break temporal correlation
+    def sample(self, batch_size):
+        return random.sample(self.buffer, batch_size)
+
+    def __len__(self):
+        return len(self.buffer)
+
+replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 env.reset()
 
-print("NOOP waiting for green light")
-for i in range(18):
-    (obs, rew, end, info) = env.step([0, 0, 0, 0, 0]) # NOOP until green light
+for episode in range(EPISODES):
+    # episode doesn't stop until terminal
+    while True:
+        print(f"Episode {episode} ========= ")
+        print("NOOP waiting for green light")
+        for i in range(18):
+            (obs, rew, end, info) = env.step([0, 0, 0, 0, 0]) # NOOP until green light
 
-print("GO! ...drive straight as fast as possible...")
-for i in range(50):
-    (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
+        print("GO!")
+        for i in range(50):
 
-print("Doughnuts!!")
-for i in range(10000):
-    if i % 100 == 0:
-        print("Step " + str(i))
-    (obs, rew, end, info) = env.step([-80, 0, 1, 0, 0]) # Hard-left doughnuts!
-    (obs, rew, end, info) = env.step([-80, 0, 0, 0, 0]) # Hard-left doughnuts!
-    # print(type(obs), obs.shape, obs)
+            # choose action to take via e-greedy approach
 
-    # convert observation to greyscale
-    greyscale = np.dot(obs[..., :3], [0.2989, 0.5870, 0.1140])
+            
+            # execute action in emulator
+            (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
 
-    if i == 0:
-        plt.imsave('saved_greyscale_image.png', greyscale, cmap='gray')
+            # preprocess image
+            # convert observation to greyscale
+            greyscale = np.dot(obs[..., :3], [0.2989, 0.5870, 0.1140])
+
+            if i == 0:
+                # plt.imsave('saved_greyscale_image.png', greyscale, cmap='gray')
+                pass
+
+            # store observation in ERB
+
+            # sample random minibatch from ERB
+
+            # compute loss
+
+            # backprop on CNN
+
+            # reset target action-value function
 
 raw_input("Press <enter> to exit... ")
 
