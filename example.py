@@ -1,5 +1,6 @@
 #!/bin/python
 import gym, gym_mupen64plus
+import torch
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 env.reset()
