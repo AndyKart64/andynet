@@ -5,6 +5,10 @@ import torch
 import gym, gym_mupen64plus
 import numpy as np
 import matplotlib.image
+import wandb
+import pytz
+import cv2
+from datetime import datetime
 from PIL import Image
 from collections import deque
 
@@ -21,7 +25,9 @@ def save_grayscale_image(gray, file_name):
         - gray: np.ndarray
         - file_name: str
     """
-    matplotlib.image.imsave('/src/gym_mupen64plus/logs/' + "file_name", gray, cmap='gray')
+    matplotlib.image.imsave('/src/gym_mupen64plus/logs/' + file_name, gray, cmap='gray')
+
+    return cv2.resize(gray, dsize=(84, 84), interpolation=cv2.INTER_CUBIC)
 
 
 ## Hyperparameters
@@ -31,6 +37,23 @@ BATCH_SIZE=32
 EPISODES=100
 C=64 # learning rate
 EPSILON=0.9 # for e-greedy
+
+# Timezone for logging
+timezone = pytz.timezone("Canada/Eastern")
+
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="AndyKart",
+    name=datetime.now(timezone).strftime("%H:%M:%S"),
+    # track hyperparameters and run metadata
+    config={
+    "erb capacity": ERB_CAPACITY,
+    "batch size": BATCH_SIZE,
+    "episodes": EPISODES,
+    "c": C,
+    "epsilon": EPSILON
+    }
+)
 
 ## Experience Replay Buffer
 class ReplayBuffer:
@@ -73,13 +96,17 @@ for episode in range(EPISODES):
             
             # execute action in emulator
             (obs, rew, end, info) = env.step([0, 0, 1, 0, 0]) # Drive straight
-
+            wandb.log({ "reward": rew })
             # preprocess image
             # convert observation to greyscale
             greyscale = rgb_to_gray(obs)
 
+            # Resize the image to 84 x 84
+            rescaled = cv2.resize(greyscale, dsize=(84, 84), interpolation=cv2.INTER_LINEAR)
+
             if i == 0:
-                save_grayscale_image(greyscale, 'saved_greyscale_image.jpg')
+                save_grayscale_image(greyscale, 'greyscale_image.jpg')
+                save_grayscale_image(rescaled, 'rescaled_image.jpg')
 
             # store observation in ERB
 
