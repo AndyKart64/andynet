@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.image
 from PIL import Image
 from collections import deque
+import wandb
 
 def rgb_to_gray(rgb):
     """
@@ -50,6 +51,10 @@ class ReplayBuffer:
 
     def __len__(self):
         return len(self.buffer)
+    
+wandb.init(
+    project="andy-kart"
+)
 
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
 
