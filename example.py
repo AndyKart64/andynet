@@ -39,6 +39,20 @@ def save_weights(model, optimizer, filename="model_weights.pth"):
     torch.save(state, filename)
     print("Model weights saved to", filename)
 
+def load_weights(model, optimizer, filename="model_weights.pth"):
+    """
+    Load the model weights and optimizer state.
+    """
+    output_dir = '/src/gym_mupen64plus/logs/'
+    filename = os.path.join(output_dir, filename)
+    if os.path.isfile(filename):
+        state = torch.load(filename)
+        model.load_state_dict(state['model_state_dict'])
+        optimizer.load_state_dict(state['optimizer_state_dict'])
+        print("Model weights loaded from", filename)
+    else:
+        print("No checkpoint found at", filename)
+
 def rgb_to_gray(rgb):
     """
     Converts the three channel RGB colour to grayscale
@@ -145,14 +159,17 @@ class DQN(nn.Module):
         # TODO sigmoid here
 
         return x
+AndyW = optim.AdamW
 
 model = DQN()
+optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
+
+load_weights(model, optimizer)
+
 target_model = DQN()
 target_model.load_state_dict(model.state_dict())
 
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
-AndyW = optim.AdamW
-optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 
@@ -283,8 +300,8 @@ for episode in range(EPISODES):
     plt.plot(x, reward_values)
     plt.savefig('/src/gym_mupen64plus/logs/' + 'rewards_' + timestamp)
 
-    if episode % 10 == 0:
-        save_weights(model, optimizer)
+    # if episode % 10 == 0:
+    #     save_weights(model, optimizer)
 
 raw_input("Press <enter> to exit... ")
 
