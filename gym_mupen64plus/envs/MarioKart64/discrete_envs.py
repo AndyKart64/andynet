@@ -4,7 +4,7 @@ from gym import spaces
 
 class DiscreteActions:
     ACTION_MAP = [
-        ("NO_OP",         [  0,   0, 0, 0, 0]),
+        # ("NO_OP",         [  0,   0, 0, 0, 0]),
         ("STRAIGHT",      [  0,   0, 1, 0, 0]),
         # ("BRAKE",         [  0,   0, 0, 1, 0]),
         # ("BACK_UP",       [  0, -80, 0, 1, 0]),

@@ -11,7 +11,7 @@ import random
 import os
 import math
 import numpy as np
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 # import matplotlib.image
 # import wandb
 from time import gmtime, strftime
@@ -19,6 +19,25 @@ import cv2
 from datetime import datetime
 from PIL import Image
 from collections import deque
+from datetime import datetime
+
+now = datetime.now()
+timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+def save_weights(model, optimizer, filename="model_weights.pth"):
+    """
+    Save the model weights and optimizer state.
+    """
+    state = {
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }
+    output_dir = '/src/gym_mupen64plus/logs/'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    filename = os.path.join(output_dir, filename)
+    torch.save(state, filename)
+    print("Model weights saved to", filename)
 
 def rgb_to_gray(rgb):
     """
@@ -141,6 +160,7 @@ best_checkpoint = 0
 cur_checkpoint = 0
 
 # loss_values = []
+reward_values = [] # used for graphing reward
 
 for episode in range(EPISODES):
 
@@ -162,6 +182,7 @@ for episode in range(EPISODES):
     max_frames = EPISODE_TIME
     frame = 0
     frames_since_checkpoint = 0
+    total_reward = 0
     while frame < max_frames:
     
 
@@ -189,7 +210,7 @@ for episode in range(EPISODES):
 
             reward = math.exp(-1/4*frames_since_checkpoint) + 0.5
             frames_since_checkpoint = 0
-            print('reached checkpoint, reward:', reward)
+            # print('reached checkpoint, reward:', reward)
 
             # first time bonus reward
             '''
@@ -199,6 +220,7 @@ for episode in range(EPISODES):
             '''
         # wandb.log({ "reward": rew })
 
+        total_reward += reward
         # save to ERB
         # TODO could technically reuse some of the reprocess calls
         replay_buffer.add(preprocess(state), action, reward, preprocess(next_state))
@@ -253,6 +275,16 @@ for episode in range(EPISODES):
         # kill agent if taking too long to get checkpoint
         # if frames_since_checkpoint > 10:
         #     break
+
+    reward_values.append(total_reward)
+
+    # save plot of rewards
+    x = np.arange(0, len(reward_values))
+    plt.plot(x, reward_values)
+    plt.savefig('/src/gym_mupen64plus/logs/' + 'rewards_' + timestamp)
+
+    if episode % 10 == 0:
+        save_weights(model, optimizer)
 
 raw_input("Press <enter> to exit... ")
 
