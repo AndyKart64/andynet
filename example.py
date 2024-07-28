@@ -44,7 +44,7 @@ def save_grayscale_image(gray, file_name):
 
 
 ## Hyperparameters
-ERB_CAPACITY=1000
+ERB_CAPACITY=5000
 BATCH_SIZE=4
 
 EPISODES=100
@@ -52,6 +52,9 @@ C=64 # how often we update Q to Q_hat
 LEARNING_RATE=1e-4
 EPSILON=0.99 # for e-greedy
 GAMMA=0.9 # for Q-learning
+
+EPSILON_MIN = 0.1
+EPSILON_DECAY = 0.995
 
 # Timezone for logging
 # timezone = pytz.timezone("Canada/Eastern")
@@ -130,6 +133,8 @@ optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 
+# loss_values = []
+
 for episode in range(EPISODES):
 
     print("Episode ", episode, " ========= ")
@@ -143,7 +148,7 @@ for episode in range(EPISODES):
 
     print("GO!")
 
-    counter=0
+    frame = 0
 
     # episode doesn't stop until terminal
     while True:
@@ -151,7 +156,7 @@ for episode in range(EPISODES):
         # choose action to take via e-greedy approach
         if random.random() < 1-EPSILON:
             # select random action
-            action = random.randint(0, len(DiscreteActions.ACTION_MAP))
+            action = random.randint(0, len(DiscreteActions.ACTION_MAP) - 1)
             #print('selected action', action)
 
         else:
@@ -199,13 +204,34 @@ for episode in range(EPISODES):
             # TODO terminate
             loss = nn.SmoothL1Loss()(target_q_values, state_action_values)
 
+            # loss_values.append(loss.item())
+
             # backprop on CNN
             optimizer.zero_grad()
             loss.backward()
 
+            # torch.nn.utils.clip_grad_value_(model.parameters(), 100)
+            optimizer.step()
+
+        if frame % C == 0:
+            target_model.load_state_dict(model.state_dict())
+
+        # EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
+
         # reset target action-value function
         state = next_state
+        frame += 1
 
 raw_input("Press <enter> to exit... ")
 
+
 env.close()
+
+# plt.figure(figsize=(10, 6))
+# plt.plot(range(len(loss_values)), loss_values, label='Loss')
+# plt.xlabel('Episode')
+# plt.ylabel('Loss')
+# plt.title('Loss over Episodes')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('loss_plot.png')
