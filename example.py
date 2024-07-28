@@ -19,14 +19,11 @@ import cv2
 from datetime import datetime
 from PIL import Image
 from collections import deque
-<<<<<<< HEAD
 import math
-=======
 from datetime import datetime
 
 now = datetime.now()
 timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
->>>>>>> master
 
 def save_weights(model, optimizer, filename="model_weights.pth"):
     """
