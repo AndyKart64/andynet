@@ -79,7 +79,7 @@ def save_grayscale_image(gray, file_name):
 
 ## Hyperparameters
 ERB_CAPACITY=5000
-BATCH_SIZE=4
+BATCH_SIZE=32
 
 EPISODES=100
 C=64 # how often we update Q to Q_hat
@@ -109,6 +109,43 @@ EPISODE_TIME = 70
 #     "epsilon": EPSILON
 #     }
 # )
+
+def lane_detection(image):
+    # Convert to grayscale
+    # Apply Gaussian blur
+    blur = cv2.GaussianBlur(image, (5, 5), 0)
+    # Perform Canny edge detection
+    edges = cv2.Canny(blur, 50, 150)
+    # Define region of interest
+    height, width = edges.shape
+    mask = np.zeros_like(edges)
+    polygon = np.array([[
+        (0, height * 0.8),
+        (width, height * 0.8),
+        (width, height),
+        (0, height),
+    ]], np.int32)
+    cv2.fillPoly(mask, polygon, 255)
+    cropped_edges = cv2.bitwise_and(edges, mask)
+    # Perform Hough Transform to detect lines
+    lines = cv2.HoughLinesP(cropped_edges, 1, np.pi / 180, 50, maxLineGap=50)
+    # Create an image to draw lines on
+    line_image = np.zeros_like(image)
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 10)
+    # Combine the line image with the original image
+    lanes = cv2.addWeighted(image, 0.8, line_image, 1, 1)
+    return lanes
+
+def is_on_pavement(image, car_position, threshold=50):
+    """
+    Check if the car is on the pavement by checking the color of the pixel at car_position.
+    """
+    pixel_color = image[car_position[1], car_position[0]]
+    gray_value = np.dot(pixel_color[:3], [0.2989, 0.5870, 0.1140])
+    return gray_value > threshold
 
 ## Experience Replay Buffer
 class ReplayBuffer:
@@ -161,6 +198,13 @@ class DQN(nn.Module):
         return x
 AndyW = optim.AdamW
 
+def huber_loss(y_true, y_pred, delta=1.0):
+    error = y_true - y_pred
+    cond = error.abs() < delta
+    squared_loss = 0.5 * error.pow(2)
+    linear_loss = delta * (error.abs() - 0.5 * delta)
+    return torch.where(cond, squared_loss, linear_loss).mean()
+
 model = DQN()
 optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
@@ -170,6 +214,9 @@ target_model = DQN()
 target_model.load_state_dict(model.state_dict())
 
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
+
+# Load checkpoint if it exists
+load_weights(model, optimizer)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 
@@ -221,6 +268,13 @@ for episode in range(EPISODES):
         # execute action in emulator
         # print('executing action', action[0])
         (next_state, reward, end, info) = env.step(DiscreteActions.ACTION_MAP[action][1])
+
+        # Penalize if not on the pavement
+        car_position = (next_state.shape[1] // 2, next_state.shape[0] // 2)  # Center of the screen
+        if not is_on_pavement(next_state, car_position):
+            reward -= 10  # Penalize for going off-pavement
+            print("Penalize for going off pavement")
+
         if reward > 0:
             cur_checkpoint += 1
             max_frames += 1 # get more time if we make progress
@@ -242,6 +296,14 @@ for episode in range(EPISODES):
         # TODO could technically reuse some of the reprocess calls
         replay_buffer.add(preprocess(state), action, reward, preprocess(next_state))
 
+        # lane_image = lane_detection(next_state)
+        # # Save lane detection result
+        # output_dir = '/src/gym_mupen64plus/logs/'
+        # if not os.path.exists(output_dir):
+        #     os.makedirs(output_dir)
+        # lane_image_filename = os.path.join(output_dir, 'lane_image.jpeg')
+        # cv2.imwrite(lane_image_filename, lane_image)
+        
         # sample random minibatch from ERB
         if len(replay_buffer) >= BATCH_SIZE:
             state_batch, action_batch, reward_batch, next_state_batch = replay_buffer.sample(BATCH_SIZE)
@@ -267,14 +329,14 @@ for episode in range(EPISODES):
 
             # compute loss
             # TODO terminate
-            loss = nn.MSELoss()(target_q_values.unsqueeze(1), state_action_values)
+            loss = huber_loss(target_q_values.unsqueeze(1), state_action_values)
 
             # loss_values.append(loss.item())
 
             # backprop on CNN
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_value_(model.parameters(), 100)
+            torch.nn.utils.clip_grad_value_(model.parameters(), 100) # TODO what value to set
             optimizer.step()
 
         if frame % C == 0:
@@ -303,11 +365,13 @@ for episode in range(EPISODES):
     # if episode % 10 == 0:
     #     save_weights(model, optimizer)
 
+    save_weights(model, optimizer)
+
 raw_input("Press <enter> to exit... ")
 
 
 env.close()
-
+cv2.destroyAllWindows()
 # plt.figure(figsize=(10, 6))
 # plt.plot(range(len(loss_values)), loss_values, label='Loss')
 # plt.xlabel('Episode')
