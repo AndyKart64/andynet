@@ -43,7 +43,7 @@ FROM base
 # Update package cache and install dependencies
 RUN apt-get update && \
     apt-get install -y \
-        python python-pip python-setuptools python-dev \
+        python python-pip python-setuptools python-dev python-tk \
         wget \
         xvfb libxv1 x11vnc \
         imagemagick \

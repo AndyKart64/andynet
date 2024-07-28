@@ -9,8 +9,9 @@ import numpy as np
 from collections import deque
 import random
 import os
+import math
 import numpy as np
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 # import matplotlib.image
 # import wandb
 from time import gmtime, strftime
@@ -18,7 +19,14 @@ import cv2
 from datetime import datetime
 from PIL import Image
 from collections import deque
+<<<<<<< HEAD
 import math
+=======
+from datetime import datetime
+
+now = datetime.now()
+timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+>>>>>>> master
 
 def save_weights(model, optimizer, filename="model_weights.pth"):
     """
@@ -109,13 +117,14 @@ BATCH_SIZE=32
 EPISODES=100
 C=64 # how often we update Q to Q_hat
 LEARNING_RATE=1e-4
-EPSILON=0.99 # for e-greedy
+EPSILON_ORIGINAL=0.3 # for e-greedy
+EPSILON=0
 GAMMA=0.9 # for Q-learning
 
-EPSILON_MIN = 0.1
+EPSILON_MIN = 0.05
 EPSILON_DECAY = 0.995
 
-EPISODE_TIME = 130
+EPISODE_TIME = 70
 
 # Timezone for logging
 # now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -220,6 +229,7 @@ class DQN(nn.Module):
         # TODO sigmoid here
 
         return x
+AndyW = optim.AdamW
 
 def huber_loss(y_true, y_pred, delta=1.0):
     error = y_true - y_pred
@@ -229,19 +239,25 @@ def huber_loss(y_true, y_pred, delta=1.0):
     return torch.where(cond, squared_loss, linear_loss).mean()
 
 model = DQN()
+optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
+
+load_weights(model, optimizer)
+
 target_model = DQN()
 target_model.load_state_dict(model.state_dict())
 
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
-AndyW = optim.AdamW
-optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 # Load checkpoint if it exists
 load_weights(model, optimizer)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 
+best_checkpoint = 0
+cur_checkpoint = 0
+
 # loss_values = []
+reward_values = [] # used for graphing reward
 
 for episode in range(EPISODES):
 
@@ -256,11 +272,19 @@ for episode in range(EPISODES):
 
     print("GO!")
 
+    if episode % 10 == 0:
+        EPSILON = EPSILON_ORIGINAL
+
     # episode doesn't stop until terminal
-    for frame in range(EPISODE_TIME):
+    max_frames = EPISODE_TIME
+    frame = 0
+    frames_since_checkpoint = 0
+    total_reward = 0
+    while frame < max_frames:
+    
 
         # choose action to take via e-greedy approach
-        if random.random() < 1-EPSILON:
+        if random.random() < EPSILON:
             # select random action
             action = random.randint(0, len(DiscreteActions.ACTION_MAP) - 1)
             #print('selected action', action)
@@ -285,16 +309,27 @@ for episode in range(EPISODES):
             print("Penalize for going off pavement")
 
         if reward > 0:
-            print('reached checkpoint')
+            cur_checkpoint += 1
+            max_frames += 1 # get more time if we make progress
+
+            reward = math.exp(-1/4*frames_since_checkpoint) + 0.5
+            frames_since_checkpoint = 0
+            # print('reached checkpoint, reward:', reward)
+
+            # first time bonus reward
+            '''
+            if cur_checkpoint < best_checkpoint:
+                best_checkpoint = cur_checkpoint
+                reward += 1
+            '''
         # wandb.log({ "reward": rew })
 
-        score = greyAvg(state)
-        print("score! " + str(score))
-        squished_score = squish(score)
-        print("squished score! " + str(squished_score))
-        reward += squished_score
-
-
+        # score = greyAvg(state)
+        # print("score! " + str(score))
+        # squished_score = squish(score)
+        # print("squished score! " + str(squished_score))
+        # reward += squished_score
+        total_reward += reward
         # save to ERB
         # TODO could technically reuse some of the reprocess calls
         replay_buffer.add(preprocess(state), action, reward, preprocess(next_state))
@@ -339,17 +374,34 @@ for episode in range(EPISODES):
             # backprop on CNN
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_value_(model.parameters(), 0.1)
+            torch.nn.utils.clip_grad_value_(model.parameters(), 100) # TODO what value to set
             optimizer.step()
 
         if frame % C == 0:
             target_model.load_state_dict(model.state_dict())
-            print('frame', frame, EPISODE_TIME)
+            print('frame', frame, '/', max_frames, '=======')
+            print('epsilon', EPSILON)
 
         EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
 
         # reset target action-value function
         state = next_state
+        frame += 1
+        frames_since_checkpoint += 1
+
+        # kill agent if taking too long to get checkpoint
+        # if frames_since_checkpoint > 10:
+        #     break
+
+    reward_values.append(total_reward)
+
+    # save plot of rewards
+    x = np.arange(0, len(reward_values))
+    plt.plot(x, reward_values)
+    plt.savefig('/src/gym_mupen64plus/logs/' + 'rewards_' + timestamp)
+
+    # if episode % 10 == 0:
+    #     save_weights(model, optimizer)
 
     save_weights(model, optimizer)
 
