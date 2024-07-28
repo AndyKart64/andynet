@@ -51,13 +51,14 @@ BATCH_SIZE=4
 EPISODES=100
 C=64 # how often we update Q to Q_hat
 LEARNING_RATE=1e-4
-EPSILON=0.08 # for e-greedy
+EPSILON_ORIGINAL=0.3 # for e-greedy
+EPSILON=0
 GAMMA=0.9 # for Q-learning
 
 EPSILON_MIN = 0.05
 EPSILON_DECAY = 0.995
 
-EPISODE_TIME = 100
+EPISODE_TIME = 70
 
 # Timezone for logging
 # now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -154,6 +155,9 @@ for episode in range(EPISODES):
 
     print("GO!")
 
+    if episode % 10 == 0:
+        EPSILON = EPSILON_ORIGINAL
+
     # episode doesn't stop until terminal
     max_frames = EPISODE_TIME
     frame = 0
@@ -239,7 +243,7 @@ for episode in range(EPISODES):
             print('frame', frame, '/', max_frames, '=======')
             print('epsilon', EPSILON)
 
-        #EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
+        EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
 
         # reset target action-value function
         state = next_state
