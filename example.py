@@ -13,7 +13,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 # import matplotlib.image
 # import wandb
-# import pytz
+from time import gmtime, strftime
 import cv2
 from datetime import datetime
 from PIL import Image
@@ -57,12 +57,12 @@ EPSILON_MIN = 0.1
 EPSILON_DECAY = 0.995
 
 # Timezone for logging
-# timezone = pytz.timezone("Canada/Eastern")
+# now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
 
 # wandb.init(
 #     # set the wandb project where this run will be logged
 #     project="AndyKart",
-#     name=datetime.now(timezone).strftime("%H:%M:%S"),
+#     name=now,
 #     # track hyperparameters and run metadata
 #     config={
 #     "erb capacity": ERB_CAPACITY,
