@@ -157,13 +157,6 @@ for episode in range(EPISODES):
             
         # execute action in emulator
         print('executing action', action[0])
-        # if (action[0] == "Straight"):
-        # elif (action[0] == "Brake"):
-        # elif (action[0] == "Back-up"):
-        # elif (action[0] == "Soft left" or action[0] == "Left" or action[0] == "Hard left" or action[0] == "Extreme left"):
-        # elif (action[0] == "Soft right" or action[0] == "Right" or action[0] == "Hard right" or action[0] == "Extreme right"):
-        # else:
-        ## NO_OP
         (obs, rew, end, info) = env.step(action[1])
         # wandb.log({ "reward": rew })
 
