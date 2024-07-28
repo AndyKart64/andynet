@@ -9,6 +9,7 @@ import numpy as np
 from collections import deque
 import random
 import os
+import math
 import numpy as np
 # import matplotlib.pyplot as plt
 # import matplotlib.image
@@ -50,13 +51,13 @@ BATCH_SIZE=4
 EPISODES=100
 C=64 # how often we update Q to Q_hat
 LEARNING_RATE=1e-4
-EPSILON=0.99 # for e-greedy
+EPSILON=0.08 # for e-greedy
 GAMMA=0.9 # for Q-learning
 
-EPSILON_MIN = 0.1
+EPSILON_MIN = 0.05
 EPSILON_DECAY = 0.995
 
-EPISODE_TIME = 130
+EPISODE_TIME = 100
 
 # Timezone for logging
 # now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -135,6 +136,9 @@ optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 
+best_checkpoint = 0
+cur_checkpoint = 0
+
 # loss_values = []
 
 for episode in range(EPISODES):
@@ -151,10 +155,14 @@ for episode in range(EPISODES):
     print("GO!")
 
     # episode doesn't stop until terminal
-    for frame in range(EPISODE_TIME):
+    max_frames = EPISODE_TIME
+    frame = 0
+    frames_since_checkpoint = 0
+    while frame < max_frames:
+    
 
         # choose action to take via e-greedy approach
-        if random.random() < 1-EPSILON:
+        if random.random() < EPSILON:
             # select random action
             action = random.randint(0, len(DiscreteActions.ACTION_MAP) - 1)
             #print('selected action', action)
@@ -172,7 +180,19 @@ for episode in range(EPISODES):
         # print('executing action', action[0])
         (next_state, reward, end, info) = env.step(DiscreteActions.ACTION_MAP[action][1])
         if reward > 0:
-            print('reached checkpoint')
+            cur_checkpoint += 1
+            max_frames += 1 # get more time if we make progress
+
+            reward = math.exp(-1/4*frames_since_checkpoint) + 0.5
+            frames_since_checkpoint = 0
+            print('reached checkpoint, reward:', reward)
+
+            # first time bonus reward
+            '''
+            if cur_checkpoint < best_checkpoint:
+                best_checkpoint = cur_checkpoint
+                reward += 1
+            '''
         # wandb.log({ "reward": rew })
 
         # save to ERB
@@ -214,17 +234,21 @@ for episode in range(EPISODES):
             torch.nn.utils.clip_grad_value_(model.parameters(), 100)
             optimizer.step()
 
-            # torch.nn.utils.clip_grad_value_(model.parameters(), 100)
-            optimizer.step()
-
         if frame % C == 0:
             target_model.load_state_dict(model.state_dict())
-            print('frame', frame, EPISODE_TIME)
+            print('frame', frame, '/', max_frames, '=======')
+            print('epsilon', EPSILON)
 
-        # EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
+        #EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
 
         # reset target action-value function
         state = next_state
+        frame += 1
+        frames_since_checkpoint += 1
+
+        # kill agent if taking too long to get checkpoint
+        # if frames_since_checkpoint > 10:
+        #     break
 
 raw_input("Press <enter> to exit... ")
 
