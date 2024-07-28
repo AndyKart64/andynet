@@ -3,6 +3,7 @@ import gym
 from gym_mupen64plus.envs.MarioKart64.discrete_envs import DiscreteActions
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 from collections import deque
@@ -44,11 +45,13 @@ def save_grayscale_image(gray, file_name):
 
 ## Hyperparameters
 ERB_CAPACITY=1000
-BATCH_SIZE=32
+BATCH_SIZE=4
 
 EPISODES=100
-C=64 # learning rate
-EPSILON=0.9 # for e-greedy
+C=64 # how often we update Q to Q_hat
+LEARNING_RATE=1e-4
+EPSILON=0.99 # for e-greedy
+GAMMA=0.9 # for Q-learning
 
 # Timezone for logging
 # timezone = pytz.timezone("Canada/Eastern")
@@ -81,11 +84,13 @@ class ReplayBuffer:
     # Randomly sample N experiences
     # It is crucial that these are not sampled in order, to break temporal correlation
     def sample(self, batch_size):
-        return random.sample(self.buffer, batch_size)
+        batch = random.sample(self.buffer, batch_size)
+        states, actions, rewards, next_states = map(np.array, zip(*batch))
+        return states, actions, rewards, next_states
 
     def __len__(self):
-    
         return len(self.buffer)
+
 class DQN(nn.Module):
 
     N_OBS=84*84
@@ -100,7 +105,6 @@ class DQN(nn.Module):
         self.fc2 = nn.Linear(DQN.HIDDEN_SIZE, DQN.N_ACTIONS)
 
     def forward(self, x):
-        print('x', x)
         x = self.conv1(x)
         x = F.relu(x)
         x = self.conv2(x)
@@ -111,14 +115,18 @@ class DQN(nn.Module):
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)
-        print('fc2', x)
+
+        # TODO sigmoid here
 
         return x
 
 model = DQN()
-print(model)
+target_model = DQN()
+target_model.load_state_dict(model.state_dict())
 
 replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
+AndyW = optim.AdamW
+optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
 
@@ -143,7 +151,7 @@ for episode in range(EPISODES):
         # choose action to take via e-greedy approach
         if random.random() < 1-EPSILON:
             # select random action
-            action = random.choice(DiscreteActions.ACTION_MAP)
+            action = random.randint(0, len(DiscreteActions.ACTION_MAP))
             #print('selected action', action)
 
         else:
@@ -151,24 +159,52 @@ for episode in range(EPISODES):
             phi_state = preprocess(state)
             tensor_state = torch.tensor(phi_state, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             q_values = model(tensor_state)
-            action = DiscreteActions.ACTION_MAP[torch.argmax(q_values, dim=1)]
+            action = torch.argmax(q_values, dim=1)
             #print('selected optimal action', action)
 
             
         # execute action in emulator
-        print('executing action', action[0])
-        (obs, rew, end, info) = env.step(action[1])
+        # print('executing action', action[0])
+        (next_state, reward, end, info) = env.step(DiscreteActions.ACTION_MAP[action][1])
         # wandb.log({ "reward": rew })
 
-        # preprocess image
+        # save to ERB
+        # TODO could technically reuse some of the reprocess calls
+        replay_buffer.add(preprocess(state), action, reward, preprocess(next_state))
 
         # sample random minibatch from ERB
+        if len(replay_buffer) >= BATCH_SIZE:
+            state_batch, action_batch, reward_batch, next_state_batch = replay_buffer.sample(BATCH_SIZE)
+            state_batch = torch.tensor(state_batch, dtype=torch.float32).unsqueeze(1)
+            action_batch = torch.tensor(action_batch).unsqueeze(1)
+            reward_batch = torch.tensor(reward_batch, dtype=torch.float32)
+            next_state_batch = torch.tensor(next_state_batch, dtype=torch.float32).unsqueeze(1)
 
-        # compute loss
+            # compute Q(s_t, a)
+            print('action_batch', action_batch.shape, action_batch)
+            state_action_values = model(state_batch).gather(1, action_batch)
+            # print('state_action_values', state_action_values.shape, state_action_values)
+            # print('state_action_values', state_action_values.shape)
 
-        # backprop on CNN
+            # compute argmax Q_hat(s_t+1, a)
+            with torch.no_grad():
+                argmax_Q = target_model(next_state_batch).max(1)[0]
+
+            print('argmax_q', argmax_Q.shape)
+            print('rewards', reward_batch.shape)
+
+            target_q_values = reward_batch + GAMMA * argmax_Q
+
+            # compute loss
+            # TODO terminate
+            loss = nn.SmoothL1Loss()(target_q_values, state_action_values)
+
+            # backprop on CNN
+            optimizer.zero_grad()
+            loss.backward()
 
         # reset target action-value function
+        state = next_state
 
 raw_input("Press <enter> to exit... ")
 
