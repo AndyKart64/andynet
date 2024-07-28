@@ -11,7 +11,7 @@ import random
 import os
 import numpy as np
 # import matplotlib.pyplot as plt
-# import matplotlib.image
+import matplotlib.image
 # import wandb
 from time import gmtime, strftime
 import cv2
@@ -107,7 +107,10 @@ class DQN(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
         self.fc1 = nn.Linear(32 * DQN.N_OBS, DQN.HIDDEN_SIZE)
-        self.fc2 = nn.Linear(DQN.HIDDEN_SIZE, DQN.N_ACTIONS)
+        self.fc2 = nn.Linear(DQN.HIDDEN_SIZE, DQN.HIDDEN_SIZE)
+        self.fc3 = nn.Linear(DQN.HIDDEN_SIZE, DQN.HIDDEN_SIZE)
+        self.fc4 = nn.Linear(DQN.HIDDEN_SIZE, DQN.HIDDEN_SIZE)
+        self.fc5 = nn.Linear(DQN.HIDDEN_SIZE, DQN.N_ACTIONS)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -120,6 +123,12 @@ class DQN(nn.Module):
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        x = F.relu(x)
+        x = self.fc4(x)
+        x = F.relu(x)
+        x = self.fc5(x)
 
         # TODO sigmoid here
 
@@ -173,12 +182,24 @@ for episode in range(EPISODES):
         (next_state, reward, end, info) = env.step(DiscreteActions.ACTION_MAP[action][1])
         if reward > 0:
             print('reached checkpoint')
-        # wandb.log({ "reward": rew })
+        antigrayness = np.mean(state[-250:-200, 256:384, :] - [89, 89, 89]) \
+            + np.mean(np.abs(state[-170:-130, 224:272, :] - [89, 89, 89])) \
+            + np.mean(np.abs(state[-170:-130, 368:416, :] - [89, 89, 89])) 
 
+        if frame % 50 == 0:
+            annotated_iamge = np.copy(next_state)
+            annotated_iamge[-250:-200, 256:384, :] = [255, 0, 0]
+            annotated_iamge[-170:-130, 224:272, :] = [255, 0, 0]
+            annotated_iamge[-170:-130, 368:416, :] = [255, 0, 0]
+            matplotlib.image.imsave('/src/gym_mupen64plus/logs/gray_box.jpeg', annotated_iamge) 
+        reward -= max(antigrayness / 320, 0)
+        print("reward", reward)
+        print("anti-grayness", antigrayness)
+        # wandb.log({ "reward": rew })
         # save to ERB
         # TODO could technically reuse some of the reprocess calls
         replay_buffer.add(preprocess(state), action, reward, preprocess(next_state))
-
+        
         # sample random minibatch from ERB
         if len(replay_buffer) >= BATCH_SIZE:
             state_batch, action_batch, reward_batch, next_state_batch = replay_buffer.sample(BATCH_SIZE)
