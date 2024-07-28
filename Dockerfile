@@ -43,7 +43,7 @@ FROM base
 # Update package cache and install dependencies
 RUN apt-get update && \
     apt-get install -y \
-        python python-pip python-setuptools python-dev \
+        python python-pip python-setuptools python-dev python-tk \
         wget \
         xvfb libxv1 x11vnc \
         imagemagick \
@@ -77,7 +77,8 @@ RUN pip install \
     torchaudio \
     matplotlib \
     wandb \
-    pytz 
+    pytz \
+    matplotlib
 
 # Copy compiled input plugin from buildstuff layer
 COPY --from=buildstuff /usr/local/lib/mupen64plus/mupen64plus-input-bot.so /usr/local/lib/mupen64plus/

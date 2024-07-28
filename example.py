@@ -11,7 +11,8 @@ import random
 import os
 import math
 import numpy as np
-# import matplotlib.pyplot as plt
+from datetime import datetime
+import matplotlib.pyplot as plt
 # import matplotlib.image
 # import wandb
 from time import gmtime, strftime
@@ -19,6 +20,11 @@ import cv2
 from datetime import datetime
 from PIL import Image
 from collections import deque
+
+# generate timestamp for this session
+
+now = datetime.now()
+timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
 
 def rgb_to_gray(rgb):
     """
@@ -57,7 +63,7 @@ GAMMA=0.9 # for Q-learning
 EPSILON_MIN = 0.05
 EPSILON_DECAY = 0.995
 
-EPISODE_TIME = 100
+EPISODE_TIME = 80
 
 # Timezone for logging
 # now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -107,9 +113,9 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.conv4 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(128 * DQN.N_OBS, DQN.HIDDEN_SIZE)
+        # self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+        # self.conv4 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(32 * DQN.N_OBS, DQN.HIDDEN_SIZE)
         self.fc2 = nn.Linear(DQN.HIDDEN_SIZE, DQN.N_ACTIONS)
 
     def forward(self, x):
@@ -117,10 +123,10 @@ class DQN(nn.Module):
         x = F.relu(x)
         x = self.conv2(x)
         x = F.relu(x)
-        x = self.conv3(x)
-        x = F.relu(x)
-        x = self.conv4(x)
-        x = F.relu(x)
+        # x = self.conv3(x)
+        # x = F.relu(x)
+        # x = self.conv4(x)
+        # x = F.relu(x)
 
         x = x.view(x.size(0), -1)
 
@@ -141,12 +147,13 @@ AndyW = optim.AdamW
 optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
-# env = gym.make('Mario-Kart-Mario-Raceway-v0')
+# env = gym.make('Mario-Kart-Moo-Moo-Farm-v0')
 
 best_checkpoint = 0
 cur_checkpoint = 0
 
 # loss_values = []
+reward_values = [] # used for graphing reward
 
 for episode in range(EPISODES):
 
@@ -165,6 +172,7 @@ for episode in range(EPISODES):
     max_frames = EPISODE_TIME
     frame = 0
     frames_since_checkpoint = 0
+    total_reward = 0
     while frame < max_frames:
     
 
@@ -192,7 +200,6 @@ for episode in range(EPISODES):
 
             reward = math.exp(-1/4*frames_since_checkpoint) + 0.5
             print('reached checkpoint, reward:', reward)
-
             frames_since_checkpoint = 0
 
             # first time bonus reward
@@ -201,6 +208,9 @@ for episode in range(EPISODES):
                 best_checkpoint = cur_checkpoint
                 reward += 1
             '''
+
+        total_reward += reward
+
         # wandb.log({ "reward": rew })
 
         # save to ERB
@@ -255,8 +265,16 @@ for episode in range(EPISODES):
         frames_since_checkpoint += 1
 
         # kill agent if taking too long to get checkpoint
-        # if frames_since_checkpoint > 10:
+        # if frames_since_checkpoint > 20:
         #     break
+
+    reward_values.append(total_reward)
+
+    # save plot of rewards
+    x = np.arange(0, len(reward_values))
+    plt.plot(x, reward_values)
+    plt.savefig('/src/gym_mupen64plus/logs/' + 'rewards_' + timestamp)
+
 
 raw_input("Press <enter> to exit... ")
 
