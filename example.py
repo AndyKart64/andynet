@@ -18,6 +18,7 @@ import cv2
 from datetime import datetime
 from PIL import Image
 from collections import deque
+import math
 
 def rgb_to_gray(rgb):
     """
@@ -41,6 +42,35 @@ def save_grayscale_image(gray, file_name):
     matplotlib.image.imsave('/src/gym_mupen64plus/logs/' + file_name, gray, cmap='gray')
 
     return downscale(gray)
+
+def isGrey(value):
+    target = [81, 81, 81]
+    tol = 10
+    err = abs(value[0]-target[0]) + abs(value[1]-target[1]) + abs(value[2]-target[2])
+    if (err < tol):
+        return True
+    return False
+
+def greyAvg(state):
+    n = 20
+    increment_v = 480/n
+    increment_h = 640/n
+    margin_percent_v = 20
+    score = 0
+    for i in range((480/margin_percent_v)+increment_v, 480-(480/margin_percent_v), increment_v):
+        for j in range(increment_h, 640-increment_h, increment_h):
+            if isGrey(state[i][j]):
+                score += 1
+    return score
+
+def squish(x):
+    # return float(1 / (1 + math.exp(-x)))/10.0
+    val = float(x-70)/100
+    if (val > 0.5):
+        val += 0.5
+    elif(val < -0.5):
+        val -= 0.5
+    return val
 
 
 ## Hyperparameters
@@ -174,6 +204,13 @@ for episode in range(EPISODES):
         if reward > 0:
             print('reached checkpoint')
         # wandb.log({ "reward": rew })
+
+        score = greyAvg(state)
+        print("score! " + str(score))
+        squished_score = squish(score)
+        print("squished score! " + str(squished_score))
+        reward += squished_score
+
 
         # save to ERB
         # TODO could technically reuse some of the reprocess calls
