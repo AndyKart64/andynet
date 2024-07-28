@@ -49,7 +49,7 @@ ERB_CAPACITY=5000
 BATCH_SIZE=4
 
 EPISODES=100
-C=64 # how often we update Q to Q_hat
+C=32 # how often we update Q to Q_hat
 LEARNING_RATE=1e-4
 EPSILON=0.08 # for e-greedy
 GAMMA=0.9 # for Q-learning
@@ -135,6 +135,7 @@ AndyW = optim.AdamW
 optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 env = gym.make('Mario-Kart-Luigi-Raceway-v0')
+# env = gym.make('Mario-Kart-Mario-Raceway-v0')
 
 best_checkpoint = 0
 cur_checkpoint = 0
@@ -184,8 +185,9 @@ for episode in range(EPISODES):
             max_frames += 1 # get more time if we make progress
 
             reward = math.exp(-1/4*frames_since_checkpoint) + 0.5
-            frames_since_checkpoint = 0
             print('reached checkpoint, reward:', reward)
+
+            frames_since_checkpoint = 0
 
             # first time bonus reward
             '''
