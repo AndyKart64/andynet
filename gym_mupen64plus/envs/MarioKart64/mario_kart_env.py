@@ -259,10 +259,10 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._wait(count=68, wait_for='Game Select screen')
         self._navigate_game_select()
 
-        self._wait(count=14, wait_for='Player Select screen')
+        self._wait(count=20, wait_for='Player Select screen')
         self._navigate_player_select()
 
-        self._wait(count=31, wait_for='Map Select screen')
+        self._wait(count=50, wait_for='Map Select screen')
         self._navigate_map_select()
 
         self._wait(count=46, wait_for='race to load')
@@ -304,6 +304,12 @@ class MarioKartEnv(Mupen64PlusEnv):
         self._press_button(ControllerState.JOYSTICK_RIGHT, times=self.PLAYER_COL)
 
         # Select character
+        self._press_button(ControllerState.A_BUTTON)
+
+        # Select CPU players
+        self._press_button(ControllerState.JOYSTICK_DOWN)
+        self._press_button(ControllerState.A_BUTTON)
+        self._press_button(ControllerState.JOYSTICK_DOWN)
         self._press_button(ControllerState.A_BUTTON)
 
         # Press OK
