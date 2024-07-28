@@ -56,6 +56,8 @@ GAMMA=0.9 # for Q-learning
 EPSILON_MIN = 0.1
 EPSILON_DECAY = 0.995
 
+EPISODE_TIME = 130
+
 # Timezone for logging
 # now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
 
@@ -148,10 +150,8 @@ for episode in range(EPISODES):
 
     print("GO!")
 
-    frame = 0
-
     # episode doesn't stop until terminal
-    while True:
+    for frame in range(EPISODE_TIME):
 
         # choose action to take via e-greedy approach
         if random.random() < 1-EPSILON:
@@ -171,6 +171,8 @@ for episode in range(EPISODES):
         # execute action in emulator
         # print('executing action', action[0])
         (next_state, reward, end, info) = env.step(DiscreteActions.ACTION_MAP[action][1])
+        if reward > 0:
+            print('reached checkpoint')
         # wandb.log({ "reward": rew })
 
         # save to ERB
@@ -186,7 +188,7 @@ for episode in range(EPISODES):
             next_state_batch = torch.tensor(next_state_batch, dtype=torch.float32).unsqueeze(1)
 
             # compute Q(s_t, a)
-            print('action_batch', action_batch.shape, action_batch)
+            # print('action_batch', action_batch.shape, action_batch)
             state_action_values = model(state_batch).gather(1, action_batch)
             # print('state_action_values', state_action_values.shape, state_action_values)
             # print('state_action_values', state_action_values.shape)
@@ -195,32 +197,34 @@ for episode in range(EPISODES):
             with torch.no_grad():
                 argmax_Q = target_model(next_state_batch).max(1)[0]
 
-            print('argmax_q', argmax_Q.shape)
-            print('rewards', reward_batch.shape)
+            # print('argmax_q', argmax_Q.shape)
+            # print('rewards', reward_batch.shape)
 
             target_q_values = reward_batch + GAMMA * argmax_Q
 
             # compute loss
             # TODO terminate
-            loss = nn.SmoothL1Loss()(target_q_values, state_action_values)
+            loss = nn.MSELoss()(target_q_values.unsqueeze(1), state_action_values)
 
             # loss_values.append(loss.item())
 
             # backprop on CNN
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_value_(model.parameters(), 100)
+            optimizer.step()
 
             # torch.nn.utils.clip_grad_value_(model.parameters(), 100)
             optimizer.step()
 
         if frame % C == 0:
             target_model.load_state_dict(model.state_dict())
+            print('frame', frame, EPISODE_TIME)
 
         # EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
 
         # reset target action-value function
         state = next_state
-        frame += 1
 
 raw_input("Press <enter> to exit... ")
 
