@@ -210,6 +210,10 @@ optimizer = AndyW(model.parameters(), lr=LEARNING_RATE, amsgrad=True)
 
 load_weights(model, optimizer)
 
+# Second model for Double DQN learning
+model_prime = DQN
+model_prime.load_state_dict(model.state_dict())
+
 target_model = DQN()
 target_model.load_state_dict(model.state_dict())
 
@@ -218,7 +222,7 @@ replay_buffer = ReplayBuffer(capacity=ERB_CAPACITY)
 # Load checkpoint if it exists
 load_weights(model, optimizer)
 
-env = gym.make('Mario-Kart-Luigi-Raceway-v0')
+env = gym.make('Mario-Kart-Moo-Moo-Farm-v0')
 
 best_checkpoint = 0
 cur_checkpoint = 0
